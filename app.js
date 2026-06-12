@@ -836,7 +836,7 @@ function renderJournal(entries) {
 
 function renderInsights(entries, calculated) {
   if (!entries.length) {
-    els.insightList.innerHTML = '<div class="empty-state">Add a round, practice session, workout, or note and patterns will show up here.</div>';
+    els.insightList.innerHTML = '<div class="empty-state">Write a few entries. This list will turn them into simple work.</div>';
     return;
   }
 
@@ -847,13 +847,12 @@ function renderInsights(entries, calculated) {
   const tagCounts = countBy(entries.flatMap((entry) => entry.tags || []).filter((tag) => !["round", "practice", "workout", "note"].includes(tag)));
 
   els.insightList.innerHTML = [
-    insight("Score trend", scoreTrendInsight(calculated)),
-    insight("Score range", calculated.scores.length ? `Average ${calculated.average.toFixed(1)}, best ${calculated.best}, worst ${calculated.worst}.` : "Add scored rounds to build a scoring baseline."),
-    insight("Costs", costInsight(calculated)),
-    insight("Walking", calculated.walkingPercent === null ? "Walking or riding data is missing." : `${calculated.walkingPercent}% of rounds with travel data were walked.`),
-    insight("Courses", topLabels(courseCounts, 3) || "Course patterns will appear after more rounds."),
-    insight("Common tags", topLabels(tagCounts, 4) || "Tags from rounds, practice, workouts, and notes will reveal repeated themes."),
-    insight("Practice and workout hints", activityCorrelationInsight(calculated.rounds, practices, workouts, notes)),
+    insight("Practice next", practicePrompt(tagCounts)),
+    insight("Why", activityCorrelationInsight(calculated.rounds, practices, workouts, notes)),
+    insight("Round wrap", scoreTrendInsight(calculated)),
+    insight("Track", calculated.scores.length ? `Average ${calculated.average.toFixed(1)}. Best ${calculated.best}. Worst ${calculated.worst}.` : "Add scored rounds to create a baseline."),
+    insight("Spend", costInsight(calculated)),
+    insight("Course context", topLabels(courseCounts, 3) || "Course context appears after more rounds."),
   ].join("");
 }
 
@@ -901,10 +900,23 @@ function scoreTrendInsight(calculated) {
 
 function costInsight(calculated) {
   if (!calculated.costs.length) {
-    return "Add round costs to track golf spend.";
+    return "Add round costs when you remember them. Keep spend visible, not fussy.";
   }
 
-  return `$${calculated.totalCost.toFixed(0)} total across ${calculated.costs.length} cost-tracked rounds, about $${calculated.averageCost.toFixed(0)} each.`;
+  return `$${calculated.totalCost.toFixed(0)} total across ${calculated.costs.length} cost-tracked rounds. About $${calculated.averageCost.toFixed(0)} each.`;
+}
+
+function practicePrompt(tagCounts) {
+  const ranked = Object.entries(tagCounts)
+    .filter(([tag]) => !["walking", "riding", "early-morning", "round"].includes(tag))
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+
+  if (!ranked.length) {
+    return "Log what felt weak. The app will turn repeated misses into a focused practice item.";
+  }
+
+  const [tag, count] = ranked[0];
+  return `${titleCase(tag.replaceAll("-", " "))}. It has appeared ${count} ${count === 1 ? "time" : "times"} in the journal.`;
 }
 
 function activityCorrelationInsight(rounds, practices, workouts, notes) {
@@ -912,11 +924,11 @@ function activityCorrelationInsight(rounds, practices, workouts, notes) {
   const activities = [...practices, ...workouts];
 
   if (!activities.length) {
-    return notes.length ? "Notes are being saved. Add practice or workout logs to compare them with future rounds." : "Add practice and workout logs to see light-touch patterns next to scores.";
+    return notes.length ? "Notes are saved. Add one practice or workout so the next item has a reason behind it." : "Add one practice or workout after a round. Keep the reason tied to the journal.";
   }
 
   if (scoredRounds.length < 4) {
-    return `${activities.length} practice/workout logs saved. Wait for 4+ scored rounds before treating patterns as meaningful.`;
+    return `${activities.length} practice/workout logs saved. Wait for 4+ scored rounds before trusting patterns.`;
   }
 
   const afterActivity = scoredRounds.filter((round) => activities.some((activity) => daysBetween(activity.entryDate, round.entryDate) >= 0 && daysBetween(activity.entryDate, round.entryDate) <= 7));
@@ -924,7 +936,7 @@ function activityCorrelationInsight(rounds, practices, workouts, notes) {
   const otherRounds = scoredRounds.filter((round) => !afterActivityIds.has(round.id));
 
   if (afterActivity.length < 2 || otherRounds.length < 2) {
-    return `${activities.length} practice/workout logs saved. More paired rounds will make the comparison less noisy.`;
+    return `${activities.length} practice/workout logs saved. More paired rounds will make this less noisy.`;
   }
 
   const activeAverage = average(afterActivity.map((round) => round.score));

@@ -10,8 +10,8 @@
     <div class="app-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Minimal Golf Journal</p>
-          <h1>Write the round down.</h1>
+          <p class="eyebrow">Golf Journal</p>
+          <h1>What happened?</h1>
         </div>
         <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
       </header>
@@ -20,16 +20,16 @@
         <section class="panel quick-add" id="add">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Quick Add</p>
-              <h2>Capture what happened</h2>
+              <p class="eyebrow">Journal Input</p>
+              <h2>Say it once. Keep what matters.</h2>
             </div>
-            <span class="pill">Private journal</span>
+            <span class="pill">Private</span>
           </div>
 
           <textarea
             id="raw-input"
             rows="6"
-            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Driver was solid. Putting needs work."
+            placeholder="Played Timber Creek Saturday at 5:50 AM. Walked 18 from the white tees and shot 86. Driver was solid. Putting needs work."
           ></textarea>
           <p class="voice-status" id="voice-status" aria-live="polite">Voice dictation ready.</p>
 
@@ -43,8 +43,8 @@
         <section class="panel preview hidden" id="preview">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Parsed Preview</p>
-              <h2>Review the entry</h2>
+              <p class="eyebrow">Review</p>
+              <h2>Keep it accurate.</h2>
             </div>
             <span class="pill" id="parse-confidence">Draft</span>
           </div>
@@ -134,7 +134,7 @@
           </form>
         </section>
 
-        <section class="stats-grid" aria-label="Golf journal stats">
+        <section class="stats-grid" aria-label="Golf journal wrap up">
           <article class="stat-card">
             <span>Rounds</span>
             <strong id="stat-rounds">0</strong>
@@ -162,7 +162,7 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Journal</p>
-                <h2>Recent entries</h2>
+                <h2>Log</h2>
               </div>
               <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
             </div>
@@ -172,8 +172,8 @@
           <aside class="panel insights" id="insights">
             <div class="section-heading">
               <div>
-                <p class="eyebrow">Insights</p>
-                <h2>Patterns</h2>
+                <p class="eyebrow">Next</p>
+                <h2>Work list</h2>
               </div>
             </div>
             <div id="insight-list" class="insight-list"></div>
@@ -183,11 +183,11 @@
     </div>
 
     <nav class="bottom-nav" aria-label="Primary">
-      <a href="#add">Add</a>
-      <a href="#journal">Journal</a>
-      <a href="#insights">Insights</a>
+      <a href="#add">Write</a>
+      <a href="#journal">Log</a>
+      <a href="#insights">Next</a>
     </nav>
 
-    <script src="./app.js?v=20260612-minimal" type="module"></script>
+    <script src="./app.js?v=20260612-rams" type="module"></script>
   </body>
 </html>
