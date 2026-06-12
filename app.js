@@ -1,6 +1,6 @@
 const STORAGE_KEY = "minimal-golf-journal:v1";
 
-const sampleRounds = [
+const sampleEntries = [
   {
     id: "round_sample_timber_creek",
     type: "round",
@@ -45,6 +45,38 @@ const sampleRounds = [
     notes: "Course was expensive and kind of mid. Driver was leaking right, putting was okay, irons were inconsistent.",
     tags: ["walking", "driver", "putting"],
   },
+  {
+    id: "practice_sample_putting",
+    type: "practice",
+    source: "sample",
+    createdAt: "2026-06-02T18:00:00.000Z",
+    updatedAt: "2026-06-02T18:00:00.000Z",
+    entryDate: "2026-06-02",
+    rawInput: "Practiced putting for 30 minutes in the garage. Focused on start line and speed control.",
+    title: "Putting practice",
+    summary: "30 minutes focused on start line and speed control.",
+    notes: "Contact felt steady. Need more work on four-foot putts.",
+    tags: ["putting", "practice"],
+    location: "Garage",
+    durationMinutes: 30,
+    focusAreas: ["putting", "start line", "speed control"],
+  },
+  {
+    id: "workout_sample_mobility",
+    type: "workout",
+    source: "sample",
+    createdAt: "2026-06-04T12:00:00.000Z",
+    updatedAt: "2026-06-04T12:00:00.000Z",
+    entryDate: "2026-06-04",
+    rawInput: "Did a golf workout today. Mobility, carries, core, and goblet squats for about 35 minutes. Hips were tight.",
+    title: "Golf workout",
+    summary: "35 minutes of mobility, carries, core, and goblet squats.",
+    notes: "Felt good overall, but hips were tight.",
+    tags: ["workout", "mobility", "core"],
+    durationMinutes: 35,
+    workoutType: "golf-specific",
+    golfRelevance: "Mobility and core work for better rotation.",
+  },
 ];
 
 const els = {
@@ -54,16 +86,23 @@ const els = {
   preview: document.querySelector("#preview"),
   confidence: document.querySelector("#parse-confidence"),
   form: document.querySelector("#entry-form"),
-  courseName: document.querySelector("#course-name"),
+  entryType: document.querySelector("#entry-type"),
+  entryTitle: document.querySelector("#entry-title"),
   entryDate: document.querySelector("#entry-date"),
+  roundFields: document.querySelector("#round-fields"),
+  activityFields: document.querySelector("#activity-fields"),
   teeTime: document.querySelector("#tee-time"),
   holes: document.querySelector("#holes"),
   tees: document.querySelector("#tees"),
   score: document.querySelector("#score"),
   travel: document.querySelector("#travel"),
+  duration: document.querySelector("#duration"),
+  location: document.querySelector("#location"),
+  focus: document.querySelector("#focus"),
   cost: document.querySelector("#cost"),
   notes: document.querySelector("#notes"),
   tags: document.querySelector("#tags"),
+  saveEntry: document.querySelector("#save-entry"),
   entryList: document.querySelector("#entry-list"),
   insightList: document.querySelector("#insight-list"),
   loadSample: document.querySelector("#load-sample"),
@@ -119,19 +158,26 @@ function parseEntry(text) {
   const raw = text.trim();
   const lower = raw.toLowerCase();
   const today = new Date().toISOString().slice(0, 10);
+  const type = detectEntryType(lower);
+  const durationMatch = lower.match(/\b(?:for|about|around)?\s*(\d{1,3})\s*(?:minutes?|mins?|min|hours?|hrs?)\b/);
   const scoreMatch = lower.match(/\b(?:shot|scored|carded|posted)\s+(\d{2,3})\b/) || lower.match(/\b(\d{2,3})\b/);
   const costMatch = lower.match(/\b(?:cost|paid|was)\s+(?:about\s+)?\$?(\d+(?:\.\d{1,2})?)\s*(?:bucks|dollars)?\b/);
   const holesMatch = lower.match(/\b(9|18)\s*holes?\b/) || lower.match(/\b(?:walked|rode|played)\s+(9|18)\b/);
   const timeMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|in the morning|at night|evening)?\b/);
   const teesMatch = lower.match(/\b(?:from the|off the|played the)\s+([a-z]+)\s+tees?\b/);
   const course = extractCourse(raw);
-  const tags = inferTags(lower);
+  const tags = inferTags(lower, type);
 
   const teeTime = timeMatch ? normalizeTime(timeMatch) : "";
   const walking = /\bwalked|walking\b/.test(lower);
   const riding = /\brode|riding|cart\b/.test(lower);
+  const durationMinutes = durationMatch ? normalizeDuration(durationMatch) : "";
+  const focusAreas = inferFocusAreas(lower);
+  const title = buildParsedTitle({ type, course, focusAreas, lower });
 
   return {
+    type,
+    title,
     courseName: course,
     entryDate: inferDate(lower) || today,
     teeTime,
@@ -139,11 +185,46 @@ function parseEntry(text) {
     tees: teesMatch?.[1] || "",
     score: scoreMatch ? Number(scoreMatch[1]) : "",
     travel: walking ? "walking" : riding ? "riding" : "",
+    durationMinutes,
+    location: extractLocation(raw, type),
+    focus: focusAreas.join(", "),
     cost: costMatch ? Number(costMatch[1]) : "",
     notes: raw,
     tags,
-    confidence: buildConfidence({ course, score: scoreMatch, time: timeMatch, cost: costMatch }),
+    confidence: buildConfidence({ type, title, score: type === "round" ? scoreMatch : true, duration: type === "round" ? true : durationMatch }),
   };
+}
+
+function detectEntryType(lower) {
+  if (/\b(swing thought|remember|reminder|note to self|mental note)\b/.test(lower)) {
+    return "note";
+  }
+
+  if (/\b(workout|worked out|lift|lifting|mobility|core|strength|squat|squats|carries|pull ups|push ups|zone 2|recovery)\b/.test(lower)) {
+    return "workout";
+  }
+
+  if (/\b(practice|practiced|range|putting green|drill|drills|garage|worked on|chipping|bunker)\b/.test(lower)) {
+    return "practice";
+  }
+
+  if (/\b(note|thought)\b/.test(lower) && !/\b(shot|played|holes?)\b/.test(lower)) {
+    return "note";
+  }
+
+  return "round";
+}
+
+function normalizeDuration(match) {
+  const value = Number(match[1]);
+  return /hour|hr/.test(match[0]) ? value * 60 : value;
+}
+
+function buildParsedTitle({ type, course, focusAreas, lower }) {
+  if (type === "round") return course || "Untitled round";
+  if (type === "practice") return focusAreas.length ? `${titleCase(focusAreas[0])} practice` : "Practice session";
+  if (type === "workout") return /\bmobility\b/.test(lower) ? "Mobility workout" : "Golf workout";
+  return "Golf note";
 }
 
 function extractCourse(raw) {
@@ -160,6 +241,17 @@ function extractCourse(raw) {
   }
 
   return "";
+}
+
+function extractLocation(raw, type) {
+  if (type === "round" || type === "note") return "";
+
+  const match = raw.match(/\b(?:at|in|inside)\s+([A-Z]?[A-Za-z0-9 '&.-]+?)(?:\.|,|\s+for|\s+and|\s+focused|\s+worked|$)/);
+  if (!match?.[1]) return "";
+
+  const location = match[1].trim();
+  if (/^(the|a|about|today)$/i.test(location)) return "";
+  return titleCase(location);
 }
 
 function cleanCourse(value) {
@@ -206,8 +298,30 @@ function inferDate(lower) {
   return "";
 }
 
-function inferTags(lower) {
+function inferFocusAreas(lower) {
+  const areas = {
+    driver: ["driver", "tee shot", "tee shots"],
+    irons: ["iron", "irons", "approach"],
+    wedges: ["wedge", "wedges", "short game"],
+    chipping: ["chip", "chipping"],
+    putting: ["putt", "putting"],
+    bunker: ["bunker", "sand"],
+    mobility: ["mobility", "hips", "rotation"],
+    core: ["core", "plank", "planks"],
+    strength: ["strength", "squat", "squats", "deadlift", "press"],
+    tempo: ["tempo", "rhythm"],
+    "start line": ["start line", "starting line"],
+    "speed control": ["speed", "speed control", "pace"],
+  };
+
+  return Object.entries(areas)
+    .filter(([, words]) => words.some((word) => lower.includes(word)))
+    .map(([area]) => area);
+}
+
+function inferTags(lower, type = "round") {
   const tagMap = {
+    [type]: [type],
     walking: ["walked", "walking"],
     riding: ["rode", "riding", "cart"],
     driver: ["driver", "tee shot", "tee shots"],
@@ -217,6 +331,10 @@ function inferTags(lower) {
     penalties: ["penalty", "penalties", "lost ball"],
     "best-round": ["best round", "personal best", "pb"],
     "early-morning": ["morning", "am", "a.m."],
+    practice: ["practice", "practiced", "range", "drill", "drills"],
+    workout: ["workout", "mobility", "core", "strength", "carries"],
+    mobility: ["mobility", "hips", "rotation"],
+    note: ["note", "thought", "reminder"],
   };
 
   return Object.entries(tagMap)
@@ -232,24 +350,31 @@ function buildConfidence(fields) {
 }
 
 function fillForm(entry) {
-  els.courseName.value = entry.courseName || "";
+  const type = entry.type || "round";
+  els.entryType.value = type;
+  els.entryTitle.value = entry.title || entry.courseName || "";
   els.entryDate.value = entry.entryDate || new Date().toISOString().slice(0, 10);
   els.teeTime.value = entry.teeTime || "";
   els.holes.value = String(entry.holes || 18);
   els.tees.value = entry.tees || "";
   els.score.value = entry.score || "";
   els.travel.value = entry.travel || (entry.walking ? "walking" : entry.riding ? "riding" : "");
+  els.duration.value = entry.durationMinutes || "";
+  els.location.value = entry.location || "";
+  els.focus.value = entry.focus || entry.focusAreas?.join(", ") || entry.exercises?.map((exercise) => exercise.name).join(", ") || "";
   els.cost.value = entry.cost ?? "";
   els.notes.value = entry.notes || "";
   els.tags.value = (entry.tags || []).join(", ");
   els.confidence.textContent = entry.confidence || "Editing";
+  updateFormMode();
   els.preview.classList.remove("hidden");
 }
 
 function formToEntry() {
   const now = new Date().toISOString();
+  const type = els.entryType.value;
   const travel = els.travel.value;
-  const courseName = els.courseName.value.trim();
+  const title = els.entryTitle.value.trim();
   const score = Number(els.score.value);
   const entryDate = els.entryDate.value;
   const tags = els.tags.value
@@ -257,41 +382,137 @@ function formToEntry() {
     .map((tag) => tag.trim().toLowerCase())
     .filter(Boolean);
 
-  return {
-    id: editingId || `round_${crypto.randomUUID()}`,
-    type: "round",
+  const baseEntry = {
+    id: editingId || `${type}_${crypto.randomUUID()}`,
+    type,
     source: parsedRawInput ? "text" : "manual",
     createdAt: editingId ? getEntry(editingId)?.createdAt || now : now,
     updatedAt: now,
     entryDate,
     rawInput: parsedRawInput,
-    title: `${courseName} - ${score}`,
-    summary: buildSummary(),
-    courseName,
-    teeTime: els.teeTime.value || null,
-    holes: Number(els.holes.value),
-    tees: els.tees.value.trim() || null,
-    score,
-    walking: travel === "walking" ? true : travel === "riding" ? false : null,
-    riding: travel === "riding" ? true : travel === "walking" ? false : null,
-    cost: els.cost.value ? Number(els.cost.value) : null,
+    title,
+    summary: buildSummary(type),
     notes: els.notes.value.trim(),
     tags,
   };
+
+  if (type === "round") {
+    return {
+      ...baseEntry,
+      courseName: title,
+      teeTime: els.teeTime.value || null,
+      holes: Number(els.holes.value),
+      tees: els.tees.value.trim() || null,
+      score,
+      walking: travel === "walking" ? true : travel === "riding" ? false : null,
+      riding: travel === "riding" ? true : travel === "walking" ? false : null,
+      cost: els.cost.value ? Number(els.cost.value) : null,
+    };
+  }
+
+  if (type === "practice") {
+    return {
+      ...baseEntry,
+      location: els.location.value.trim() || null,
+      durationMinutes: els.duration.value ? Number(els.duration.value) : null,
+      focusAreas: splitList(els.focus.value),
+    };
+  }
+
+  if (type === "workout") {
+    return {
+      ...baseEntry,
+      workoutType: inferWorkoutType(els.focus.value, els.notes.value),
+      durationMinutes: els.duration.value ? Number(els.duration.value) : null,
+      exercises: splitList(els.focus.value).map((name) => ({ name })),
+      golfRelevance: els.notes.value.trim() || null,
+    };
+  }
+
+  return baseEntry;
 }
 
-function buildSummary() {
+function buildSummary(type) {
   const pieces = [];
-  if (els.travel.value) pieces.push(els.travel.value === "walking" ? `Walked ${els.holes.value}` : `Rode ${els.holes.value}`);
-  if (els.tees.value.trim()) pieces.push(`${els.tees.value.trim()} tees`);
-  if (els.cost.value) pieces.push(`$${Number(els.cost.value).toFixed(0)}`);
+
+  if (type === "round") {
+    if (els.travel.value) pieces.push(els.travel.value === "walking" ? `Walked ${els.holes.value}` : `Rode ${els.holes.value}`);
+    if (els.tees.value.trim()) pieces.push(`${els.tees.value.trim()} tees`);
+    if (els.cost.value) pieces.push(`$${Number(els.cost.value).toFixed(0)}`);
+  } else {
+    if (els.duration.value) pieces.push(`${Number(els.duration.value)} minutes`);
+    if (els.location.value.trim()) pieces.push(els.location.value.trim());
+    if (els.focus.value.trim()) pieces.push(els.focus.value.trim());
+  }
 
   const note = els.notes.value.trim();
   return [pieces.join(" · "), note].filter(Boolean).join(". ");
 }
 
+function updateFormMode() {
+  const type = els.entryType.value;
+  const isRound = type === "round";
+  els.roundFields.classList.toggle("hidden", !isRound);
+  els.activityFields.classList.toggle("hidden", isRound || type === "note");
+  els.cost.closest("label").classList.toggle("hidden", !isRound);
+  els.score.required = isRound;
+  els.saveEntry.textContent = `Save ${entryTypeLabel(type)}`;
+}
+
+function splitList(value) {
+  return value
+    .split(",")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function inferWorkoutType(focus, notes) {
+  const lower = `${focus} ${notes}`.toLowerCase();
+  if (/\bmobility|hips|rotation|stretch\b/.test(lower)) return "mobility";
+  if (/\bcore|plank\b/.test(lower)) return "core";
+  if (/\bstrength|squat|deadlift|press|carry|carries\b/.test(lower)) return "strength";
+  if (/\brecovery|easy\b/.test(lower)) return "recovery";
+  return "golf-specific";
+}
+
+function entryTypeLabel(type) {
+  return {
+    round: "Round",
+    practice: "Practice",
+    workout: "Workout",
+    note: "Note",
+  }[type] || "Entry";
+}
+
+function entryMainStat(entry) {
+  if (entry.type === "round") return entry.score || "—";
+  if (entry.type === "practice" || entry.type === "workout") return entry.durationMinutes ? `${entry.durationMinutes}m` : "Log";
+  return "Note";
+}
+
+function entryTitle(entry) {
+  return entry.title || entry.courseName || entry.workoutType || "Untitled entry";
+}
+
+function entryTags(entry) {
+  return Array.from(new Set([entry.type, ...(entry.tags || [])])).filter(Boolean);
+}
+
+function entryMeta(entry) {
+  return `${entryTypeLabel(entry.type).toUpperCase()} · ${formatDate(entry.entryDate)}`;
+}
+
+function normalizeLegacyEntry(entry) {
+  if (entry.type === "round" && !entry.title && entry.courseName) {
+    return { ...entry, title: entry.courseName };
+  }
+
+  return entry;
+}
+
 function getEntry(id) {
-  return readStore().entries.find((entry) => entry.id === id);
+  const entry = readStore().entries.find((item) => item.id === id);
+  return entry ? normalizeLegacyEntry(entry) : undefined;
 }
 
 function saveEntry(entry) {
@@ -329,7 +550,7 @@ function stats(entries) {
 
 function render() {
   const store = readStore();
-  const entries = [...store.entries].sort((a, b) => b.entryDate.localeCompare(a.entryDate));
+  const entries = [...store.entries].map(normalizeLegacyEntry).sort((a, b) => b.entryDate.localeCompare(a.entryDate));
   const calculated = stats(entries);
 
   renderStats(calculated);
@@ -350,27 +571,27 @@ function renderStats(calculated) {
 
 function renderJournal(entries) {
   if (!entries.length) {
-    els.entryList.innerHTML = '<div class="empty-state">No rounds logged yet. Add your first dictated round and it will show up here.</div>';
+    els.entryList.innerHTML = '<div class="empty-state">No entries logged yet. Add your first dictated round, practice session, workout, or note and it will show up here.</div>';
     return;
   }
 
   els.entryList.innerHTML = entries
     .map(
       (entry) => `
-        <article class="entry-card">
+        <article class="entry-card entry-card-${escapeHtml(entry.type)}">
           <div>
-            <p class="entry-meta">ROUND · ${formatDate(entry.entryDate)}</p>
-            <h3>${escapeHtml(entry.courseName)}</h3>
+            <p class="entry-meta">${escapeHtml(entryMeta(entry))}</p>
+            <h3>${escapeHtml(entryTitle(entry))}</h3>
             <p class="entry-summary">${escapeHtml(entry.summary || entry.notes || "")}</p>
             <div class="tag-list">
-              ${(entry.tags || []).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
+              ${entryTags(entry).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
             </div>
             <div class="card-actions">
               <button class="text-button" data-action="edit" data-id="${entry.id}" type="button">Edit</button>
               <button class="text-button danger" data-action="delete" data-id="${entry.id}" type="button">Delete</button>
             </div>
           </div>
-          <div class="score-badge">${entry.score}</div>
+          <div class="score-badge score-badge-${escapeHtml(entry.type)}">${escapeHtml(entryMainStat(entry))}</div>
         </article>
       `,
     )
@@ -383,7 +604,7 @@ function renderInsights(entries, calculated) {
     return;
   }
 
-  const courseCounts = countBy(calculated.rounds.map((round) => round.courseName));
+  const courseCounts = countBy(calculated.rounds.map((round) => round.courseName || round.title));
   const tagCounts = countBy(calculated.rounds.flatMap((round) => round.tags || []));
   const trend = calculated.scores.length >= 2 ? calculated.scores[0] - calculated.scores[calculated.scores.length - 1] : 0;
 
@@ -437,8 +658,11 @@ els.clearEntry.addEventListener("click", () => {
   parsedRawInput = "";
   els.rawInput.value = "";
   els.form.reset();
+  updateFormMode();
   els.preview.classList.add("hidden");
 });
+
+els.entryType.addEventListener("change", updateFormMode);
 
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
@@ -448,6 +672,7 @@ els.form.addEventListener("submit", (event) => {
   parsedRawInput = "";
   els.rawInput.value = "";
   els.form.reset();
+  updateFormMode();
   els.preview.classList.add("hidden");
   render();
   document.querySelector("#journal").scrollIntoView({ behavior: "smooth", block: "start" });
@@ -480,7 +705,7 @@ els.entryList.addEventListener("click", (event) => {
 els.loadSample.addEventListener("click", () => {
   const store = readStore();
   const ids = new Set(store.entries.map((entry) => entry.id));
-  const entries = [...store.entries, ...sampleRounds.filter((entry) => !ids.has(entry.id))];
+  const entries = [...store.entries, ...sampleEntries.filter((entry) => !ids.has(entry.id))];
   writeStore({ ...store, entries });
   render();
 });
@@ -497,3 +722,4 @@ els.exportJson.addEventListener("click", () => {
 });
 
 render();
+updateFormMode();

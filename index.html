@@ -21,7 +21,7 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Quick Add</p>
-              <h2>Tell me about the round</h2>
+              <h2>Tell me about the entry</h2>
             </div>
             <span class="pill">Local only</span>
           </div>
@@ -29,7 +29,7 @@
           <textarea
             id="raw-input"
             rows="6"
-            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Driver was decent, irons were good, putting was shaky. Cost was 44 bucks."
+            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Or: Practiced putting for 30 minutes. Or: Did mobility and core workout for 35 minutes."
           ></textarea>
 
           <div class="button-row">
@@ -50,13 +50,25 @@
           <form id="entry-form" class="entry-form">
             <div class="form-grid">
               <label>
-                Course
-                <input id="course-name" name="courseName" type="text" required />
+                Type
+                <select id="entry-type" name="entryType">
+                  <option value="round">Round</option>
+                  <option value="practice">Practice</option>
+                  <option value="workout">Workout</option>
+                  <option value="note">Note</option>
+                </select>
+              </label>
+              <label>
+                Title
+                <input id="entry-title" name="entryTitle" type="text" required />
               </label>
               <label>
                 Date
                 <input id="entry-date" name="entryDate" type="date" required />
               </label>
+            </div>
+
+            <div class="form-grid" id="round-fields">
               <label>
                 Tee time
                 <input id="tee-time" name="teeTime" type="time" />
@@ -74,7 +86,7 @@
               </label>
               <label>
                 Score
-                <input id="score" name="score" min="1" type="number" required />
+                <input id="score" name="score" min="1" type="number" />
               </label>
               <label>
                 Travel
@@ -84,11 +96,27 @@
                   <option value="riding">Riding</option>
                 </select>
               </label>
+            </div>
+
+            <div class="form-grid hidden" id="activity-fields">
               <label>
-                Cost
-                <input id="cost" name="cost" min="0" step="0.01" type="number" />
+                Duration
+                <input id="duration" name="duration" min="0" type="number" />
+              </label>
+              <label>
+                Location
+                <input id="location" name="location" type="text" />
+              </label>
+              <label>
+                Focus
+                <input id="focus" name="focus" type="text" />
               </label>
             </div>
+
+            <label class="cost-field">
+              Cost
+              <input id="cost" name="cost" min="0" step="0.01" type="number" />
+            </label>
 
             <label>
               Notes
@@ -100,7 +128,7 @@
               <input id="tags" name="tags" type="text" placeholder="walking, putting, best-round" />
             </label>
 
-            <button class="button button-primary full-width" type="submit">Save Round</button>
+            <button class="button button-primary full-width" id="save-entry" type="submit">Save Entry</button>
           </form>
         </section>
 
@@ -132,7 +160,7 @@
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Journal</p>
-                <h2>Recent rounds</h2>
+                <h2>Recent entries</h2>
               </div>
               <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
             </div>
@@ -158,6 +186,6 @@
       <a href="#insights">Insights</a>
     </nav>
 
-    <script src="./app.js?v=20260611" type="module"></script>
+    <script src="./app.js?v=20260612-entry-types" type="module"></script>
   </body>
 </html>
