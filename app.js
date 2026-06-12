@@ -81,6 +81,8 @@ const sampleEntries = [
 
 const els = {
   rawInput: document.querySelector("#raw-input"),
+  toggleDictation: document.querySelector("#toggle-dictation"),
+  voiceStatus: document.querySelector("#voice-status"),
   parseEntry: document.querySelector("#parse-entry"),
   clearEntry: document.querySelector("#clear-entry"),
   preview: document.querySelector("#preview"),
@@ -119,6 +121,10 @@ const els = {
 
 let editingId = null;
 let parsedRawInput = "";
+let recognition = null;
+let isListening = false;
+let dictationBaseText = "";
+let dictationUsed = false;
 
 function readStore() {
   try {
@@ -144,6 +150,92 @@ function readStore() {
 
 function writeStore(store) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
+}
+
+function setupDictation() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+
+  if (!SpeechRecognition) {
+    els.toggleDictation.disabled = true;
+    els.voiceStatus.textContent = "Voice dictation is not supported in this browser.";
+    return;
+  }
+
+  recognition = new SpeechRecognition();
+  recognition.continuous = true;
+  recognition.interimResults = true;
+  recognition.lang = "en-US";
+
+  recognition.addEventListener("start", () => {
+    isListening = true;
+    dictationBaseText = els.rawInput.value.trim();
+    setDictationState("listening", "Listening...");
+  });
+
+  recognition.addEventListener("result", (event) => {
+    let finalText = "";
+    let interimText = "";
+
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const transcript = event.results[index][0]?.transcript?.trim();
+      if (!transcript) continue;
+
+      if (event.results[index].isFinal) {
+        finalText += `${transcript} `;
+      } else {
+        interimText += `${transcript} `;
+      }
+    }
+
+    if (finalText) {
+      dictationUsed = true;
+      dictationBaseText = [dictationBaseText, finalText.trim()].filter(Boolean).join(" ");
+    }
+
+    els.rawInput.value = [dictationBaseText, interimText.trim()].filter(Boolean).join(" ");
+    els.voiceStatus.textContent = interimText ? "Listening..." : "Dictation captured.";
+  });
+
+  recognition.addEventListener("end", () => {
+    isListening = false;
+    setDictationState("idle", els.rawInput.value.trim() ? "Dictation stopped." : "Voice dictation ready.");
+  });
+
+  recognition.addEventListener("error", (event) => {
+    isListening = false;
+    setDictationState("idle", voiceErrorMessage(event.error));
+  });
+}
+
+function toggleDictation() {
+  if (!recognition) return;
+
+  if (isListening) {
+    recognition.stop();
+    return;
+  }
+
+  try {
+    recognition.start();
+  } catch {
+    els.voiceStatus.textContent = "Dictation is already starting.";
+  }
+}
+
+function setDictationState(state, message) {
+  const listening = state === "listening";
+  els.toggleDictation.classList.toggle("is-listening", listening);
+  els.toggleDictation.setAttribute("aria-pressed", String(listening));
+  els.toggleDictation.textContent = listening ? "Stop Dictation" : "Start Dictation";
+  els.voiceStatus.textContent = message;
+}
+
+function voiceErrorMessage(error) {
+  if (error === "not-allowed" || error === "service-not-allowed") return "Microphone access was blocked.";
+  if (error === "no-speech") return "No speech detected.";
+  if (error === "audio-capture") return "No microphone was found.";
+  if (error === "network") return "Voice dictation needs a network connection in this browser.";
+  return "Voice dictation stopped.";
 }
 
 function formatDate(dateString) {
@@ -385,7 +477,7 @@ function formToEntry() {
   const baseEntry = {
     id: editingId || `${type}_${crypto.randomUUID()}`,
     type,
-    source: parsedRawInput ? "text" : "manual",
+    source: dictationUsed ? "voice" : parsedRawInput ? "text" : "manual",
     createdAt: editingId ? getEntry(editingId)?.createdAt || now : now,
     updatedAt: now,
     entryDate,
@@ -654,13 +746,19 @@ els.parseEntry.addEventListener("click", () => {
 });
 
 els.clearEntry.addEventListener("click", () => {
+  if (isListening && recognition) recognition.stop();
   editingId = null;
   parsedRawInput = "";
   els.rawInput.value = "";
+  dictationBaseText = "";
+  dictationUsed = false;
   els.form.reset();
   updateFormMode();
   els.preview.classList.add("hidden");
+  if (recognition) setDictationState("idle", "Voice dictation ready.");
 });
+
+els.toggleDictation.addEventListener("click", toggleDictation);
 
 els.entryType.addEventListener("change", updateFormMode);
 
@@ -671,6 +769,8 @@ els.form.addEventListener("submit", (event) => {
   editingId = null;
   parsedRawInput = "";
   els.rawInput.value = "";
+  dictationBaseText = "";
+  dictationUsed = false;
   els.form.reset();
   updateFormMode();
   els.preview.classList.add("hidden");
@@ -723,3 +823,4 @@ els.exportJson.addEventListener("click", () => {
 
 render();
 updateFormMode();
+setupDictation();

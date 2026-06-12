@@ -31,8 +31,10 @@
             rows="6"
             placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Or: Practiced putting for 30 minutes. Or: Did mobility and core workout for 35 minutes."
           ></textarea>
+          <p class="voice-status" id="voice-status" aria-live="polite">Voice dictation ready.</p>
 
           <div class="button-row">
+            <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false">Start Dictation</button>
             <button class="button button-primary" id="parse-entry" type="button">Parse Entry</button>
             <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
           </div>
@@ -186,6 +188,6 @@
       <a href="#insights">Insights</a>
     </nav>
 
-    <script src="./app.js?v=20260612-entry-types" type="module"></script>
+    <script src="./app.js?v=20260612-voice" type="module"></script>
   </body>
 </html>
