@@ -252,15 +252,14 @@ function parseEntry(text) {
   const today = new Date().toISOString().slice(0, 10);
   const type = detectEntryType(lower);
   const durationMatch = lower.match(/\b(?:for|about|around)?\s*(\d{1,3})\s*(?:minutes?|mins?|min|hours?|hrs?)\b/);
-  const scoreMatch = lower.match(/\b(?:shot|scored|carded|posted)\s+(\d{2,3})\b/) || lower.match(/\b(\d{2,3})\b/);
-  const costMatch = lower.match(/\b(?:cost|paid|was)\s+(?:about\s+)?\$?(\d+(?:\.\d{1,2})?)\s*(?:bucks|dollars)?\b/);
-  const holesMatch = lower.match(/\b(9|18)\s*holes?\b/) || lower.match(/\b(?:walked|rode|played)\s+(9|18)\b/);
-  const timeMatch = lower.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|in the morning|at night|evening)?\b/);
-  const teesMatch = lower.match(/\b(?:from the|off the|played the)\s+([a-z]+)\s+tees?\b/);
+  const score = type === "round" ? extractScore(lower) : "";
+  const cost = type === "round" ? extractCost(lower) : "";
+  const holes = extractHoles(lower);
+  const teeTime = type === "round" ? extractTeeTime(lower) : "";
+  const tees = extractTees(lower);
   const course = extractCourse(raw);
   const tags = inferTags(lower, type);
 
-  const teeTime = timeMatch ? normalizeTime(timeMatch) : "";
   const walking = /\bwalked|walking\b/.test(lower);
   const riding = /\brode|riding|cart\b/.test(lower);
   const durationMinutes = durationMatch ? normalizeDuration(durationMatch) : "";
@@ -273,31 +272,35 @@ function parseEntry(text) {
     courseName: course,
     entryDate: inferDate(lower) || today,
     teeTime,
-    holes: holesMatch ? Number(holesMatch[1]) : 18,
-    tees: teesMatch?.[1] || "",
-    score: scoreMatch ? Number(scoreMatch[1]) : "",
+    holes,
+    tees,
+    score,
     travel: walking ? "walking" : riding ? "riding" : "",
     durationMinutes,
     location: extractLocation(raw, type),
     focus: focusAreas.join(", "),
-    cost: costMatch ? Number(costMatch[1]) : "",
+    cost,
     notes: raw,
     tags,
-    confidence: buildConfidence({ type, title, score: type === "round" ? scoreMatch : true, duration: type === "round" ? true : durationMatch }),
+    confidence: buildConfidence({ type, title, score: type === "round" ? score : true, duration: type === "round" ? true : durationMatch }),
   };
 }
 
 function detectEntryType(lower) {
-  if (/\b(swing thought|remember|reminder|note to self|mental note)\b/.test(lower)) {
-    return "note";
-  }
-
-  if (/\b(workout|worked out|lift|lifting|mobility|core|strength|squat|squats|carries|pull ups|push ups|zone 2|recovery)\b/.test(lower)) {
+  if (/\b(workout|worked out|lift|lifting|mobility|core|strength|squat|squats|carries|carry|pull ups|push ups|zone 2|recovery)\b/.test(lower)) {
     return "workout";
   }
 
-  if (/\b(practice|practiced|range|putting green|drill|drills|garage|worked on|chipping|bunker)\b/.test(lower)) {
+  if (/\b(practice|practiced|range|putting green|drill|drills|garage|worked on|working on|range session|chipping|bunker)\b/.test(lower)) {
     return "practice";
+  }
+
+  if (/\b(played|shot|scored|carded|posted|fired|walked|rode|holes?|tees?)\b/.test(lower)) {
+    return "round";
+  }
+
+  if (/\b(swing thought|remember|reminder|note to self|mental note)\b/.test(lower)) {
+    return "note";
   }
 
   if (/\b(note|thought)\b/.test(lower) && !/\b(shot|played|holes?)\b/.test(lower)) {
@@ -319,20 +322,100 @@ function buildParsedTitle({ type, course, focusAreas, lower }) {
   return "Golf note";
 }
 
+function extractScore(lower) {
+  const patterns = [
+    /\b(?:shot|scored|carded|posted|fired|made|had)\s+(?:a|an)?\s*(\d{2,3})\b/,
+    /\b(?:finished|came in)\s+(?:with\s+)?(?:a|an)?\s*(\d{2,3})\b/,
+    /\b(?:for|with)\s+(?:a|an)?\s*(\d{2,3})\s*(?:on the card|total)?\b/,
+  ];
+
+  const explicitScore = extractNumberFromPatterns(lower, patterns);
+  if (explicitScore) return explicitScore;
+
+  const scoreCandidateText = lower
+    .replace(/\$\s*\d+(?:\.\d{1,2})?\b/g, "")
+    .replace(/\b\d+(?:\.\d{1,2})?\s*(?:bucks|dollars|minutes?|mins?|min|hours?|hrs?|holes?)\b/g, "")
+    .replace(/\b(?:at|around)\s+\d{1,2}(?::\d{2})?\s*(?:a\.?m\.?|p\.?m\.?|am|pm)?\b/g, "");
+  const fallback = scoreCandidateText.match(/\b([6-9]\d|1[0-4]\d)\b/);
+  return fallback ? Number(fallback[1]) : "";
+}
+
+function extractCost(lower) {
+  const patterns = [
+    /\b(?:cost(?:\s+was)?|paid|spent|green fee(?:\s+was)?|fee(?:\s+was)?)\s+(?:about|around)?\s*\$?(\d+(?:\.\d{1,2})?)\s*(?:bucks|dollars)?\b/,
+    /\b(?:for)\s+\$?(\d+(?:\.\d{1,2})?)\s*(?:bucks|dollars)\b/,
+    /\b(\d+(?:\.\d{1,2})?)\s*(?:bucks|dollars)\b/,
+    /\$\s*(\d+(?:\.\d{1,2})?)\b/,
+  ];
+
+  return extractNumberFromPatterns(lower, patterns);
+}
+
+function extractHoles(lower) {
+  if (/\b(?:front|back)\s+nine\b|\bnine\s+holes?\b/.test(lower)) return 9;
+  if (/\beighteen\s+holes?\b/.test(lower)) return 18;
+
+  const match = lower.match(/\b(9|18)\s*holes?\b/) || lower.match(/\b(?:walked|rode|played)\s+(9|18)\b/);
+  return match ? Number(match[1]) : 18;
+}
+
+function extractTees(lower) {
+  const match =
+    lower.match(/\b(?:from the|off the|played the)\s+([a-z]+)\s+tees?\b/) ||
+    lower.match(/\b(?:from|off)\s+([a-z]+)s\b/) ||
+    lower.match(/\b(black|blue|white|gold|red|green|silver|tips?)\s+tees?\b/);
+
+  if (!match?.[1]) return "";
+  return match[1].replace(/s$/, "");
+}
+
+function extractTeeTime(lower) {
+  const patterns = [
+    /\b(?:tee(?:d)?\s*(?:off)?|tee time|at|around)\s+(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?|am|pm|in the morning|at night|evening)?\b/,
+    /\b(\d{1,2}):(\d{2})\s*(a\.?m\.?|p\.?m\.?|am|pm|in the morning|at night|evening)?\b/,
+    /\b(\d{1,2})\s*(a\.?m\.?|p\.?m\.?|am|pm|in the morning|at night|evening)\b/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = lower.match(pattern);
+    if (!match) continue;
+    if (!match[2] && !match[3] && Number(match[1]) > 12) continue;
+    const normalized = match.length === 3 ? [match[0], match[1], "00", match[2]] : match;
+    return normalizeTime(normalized);
+  }
+
+  return "";
+}
+
+function extractNumberFromPatterns(text, patterns) {
+  for (const pattern of patterns) {
+    const match = text.match(pattern);
+    if (match?.[1]) return Number(match[1]);
+  }
+
+  return "";
+}
+
 function extractCourse(raw) {
   const patterns = [
-    /\bplayed\s+(.+?)\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|yesterday|today|at|around|on|from|and|,|$)/i,
-    /\bat\s+([A-Z][A-Za-z0-9 '&.-]+?)(?:\s+at|\s+around|,|$)/,
+    /\bplayed(?:\s+at)?\s+(.+?)(?:\s+(?:sunday|monday|tuesday|wednesday|thursday|friday|saturday|yesterday|today|at\s+\d|around\s+\d|on|from|off|walked|walking|rode|riding|shot|scored|carded|posted|fired|cost|paid|and)|,|\.|$)/i,
+    /\b(?:round|played|shot\s+\d{2,3}|scored\s+\d{2,3})\s+at\s+([A-Z][A-Za-z0-9 '&.-]+?)(?:\s+at\s+\d|\s+around\s+\d|\s+from|\s+off|,|\.|$)/i,
+    /\bat\s+([A-Z][A-Za-z0-9 '&.-]+?)(?:\s+at\s+\d|\s+around\s+\d|\s+from|\s+off|,|\.|$)/,
   ];
 
   for (const pattern of patterns) {
     const match = raw.match(pattern);
     if (match?.[1]) {
-      return titleCase(cleanCourse(match[1]));
+      const course = cleanCourse(match[1]);
+      if (isCourseLike(course)) return titleCase(course);
     }
   }
 
   return "";
+}
+
+function isCourseLike(value) {
+  return value && !/^(?:around|about)?\s*\d+\s*holes?$/i.test(value) && !/^\d+$/.test(value);
 }
 
 function extractLocation(raw, type) {
@@ -341,7 +424,7 @@ function extractLocation(raw, type) {
   const match = raw.match(/\b(?:at|in|inside)\s+([A-Z]?[A-Za-z0-9 '&.-]+?)(?:\.|,|\s+for|\s+and|\s+focused|\s+worked|$)/);
   if (!match?.[1]) return "";
 
-  const location = match[1].trim();
+  const location = match[1].trim().replace(/^the\s+/i, "");
   if (/^(the|a|about|today)$/i.test(location)) return "";
   return titleCase(location);
 }
@@ -372,9 +455,40 @@ function inferDate(lower) {
   const today = new Date();
   const date = new Date(today);
 
+  if (/\btoday\b/.test(lower)) {
+    return today.toISOString().slice(0, 10);
+  }
+
   if (/\byesterday\b/.test(lower)) {
     date.setDate(today.getDate() - 1);
     return date.toISOString().slice(0, 10);
+  }
+
+  const numericDate = lower.match(/\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/);
+  if (numericDate) {
+    return formatParsedDate(Number(numericDate[1]), Number(numericDate[2]), numericDate[3]);
+  }
+
+  const monthNames = {
+    january: 0,
+    february: 1,
+    march: 2,
+    april: 3,
+    may: 4,
+    june: 5,
+    july: 6,
+    august: 7,
+    september: 8,
+    october: 9,
+    november: 10,
+    december: 11,
+  };
+  const monthPattern = new RegExp(`\\b(${Object.keys(monthNames).join("|")})\\s+(\\d{1,2})(?:st|nd|rd|th)?\\b`);
+  const monthDate = lower.match(monthPattern);
+  if (monthDate) {
+    const parsed = new Date(today.getFullYear(), monthNames[monthDate[1]], Number(monthDate[2]));
+    if (parsed > today) parsed.setFullYear(parsed.getFullYear() - 1);
+    return parsed.toISOString().slice(0, 10);
   }
 
   const weekdays = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
@@ -390,6 +504,16 @@ function inferDate(lower) {
   return "";
 }
 
+function formatParsedDate(month, day, yearText) {
+  const today = new Date();
+  let year = yearText ? Number(yearText) : today.getFullYear();
+  if (year < 100) year += 2000;
+
+  const parsed = new Date(year, month - 1, day);
+  if (!yearText && parsed > today) parsed.setFullYear(parsed.getFullYear() - 1);
+  return parsed.toISOString().slice(0, 10);
+}
+
 function inferFocusAreas(lower) {
   const areas = {
     driver: ["driver", "tee shot", "tee shots"],
@@ -398,9 +522,15 @@ function inferFocusAreas(lower) {
     chipping: ["chip", "chipping"],
     putting: ["putt", "putting"],
     bunker: ["bunker", "sand"],
+    alignment: ["alignment", "aim"],
+    setup: ["setup", "posture", "ball position"],
+    grip: ["grip"],
+    takeaway: ["takeaway"],
+    transition: ["transition"],
+    contact: ["contact", "strike", "ball striking"],
     mobility: ["mobility", "hips", "rotation"],
     core: ["core", "plank", "planks"],
-    strength: ["strength", "squat", "squats", "deadlift", "press"],
+    strength: ["strength", "squat", "squats", "deadlift", "press", "carry", "carries"],
     tempo: ["tempo", "rhythm"],
     "start line": ["start line", "starting line"],
     "speed control": ["speed", "speed control", "pace"],
@@ -423,6 +553,13 @@ function inferTags(lower, type = "round") {
     penalties: ["penalty", "penalties", "lost ball"],
     "best-round": ["best round", "personal best", "pb"],
     "early-morning": ["morning", "am", "a.m."],
+    "miss-right": ["leaking right", "miss right", "missing right", "slice", "push"],
+    "miss-left": ["pulled", "pull hook", "hook", "miss left", "missing left"],
+    contact: ["contact", "strike", "ball striking"],
+    tempo: ["tempo", "rhythm"],
+    "swing-thought": ["swing thought", "remember", "reminder", "note to self", "mental note"],
+    strength: ["felt good", "worked well", "solid", "best round", "contact felt better"],
+    weakness: ["needs work", "need more work", "struggled", "shaky", "leaking", "missing", "inconsistent"],
     practice: ["practice", "practiced", "range", "drill", "drills"],
     workout: ["workout", "mobility", "core", "strength", "carries"],
     mobility: ["mobility", "hips", "rotation"],
