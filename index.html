@@ -1,0 +1,163 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minimal Golf Journal</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Minimal Golf Journal</p>
+          <h1>Golf notes that turn into useful data.</h1>
+        </div>
+        <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
+      </header>
+
+      <main>
+        <section class="panel quick-add" id="add">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Quick Add</p>
+              <h2>Tell me about the round</h2>
+            </div>
+            <span class="pill">Local only</span>
+          </div>
+
+          <textarea
+            id="raw-input"
+            rows="6"
+            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Driver was decent, irons were good, putting was shaky. Cost was 44 bucks."
+          ></textarea>
+
+          <div class="button-row">
+            <button class="button button-primary" id="parse-entry" type="button">Parse Entry</button>
+            <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
+          </div>
+        </section>
+
+        <section class="panel preview hidden" id="preview">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Parsed Preview</p>
+              <h2>Review before saving</h2>
+            </div>
+            <span class="pill" id="parse-confidence">Draft</span>
+          </div>
+
+          <form id="entry-form" class="entry-form">
+            <div class="form-grid">
+              <label>
+                Course
+                <input id="course-name" name="courseName" type="text" required />
+              </label>
+              <label>
+                Date
+                <input id="entry-date" name="entryDate" type="date" required />
+              </label>
+              <label>
+                Tee time
+                <input id="tee-time" name="teeTime" type="time" />
+              </label>
+              <label>
+                Holes
+                <select id="holes" name="holes">
+                  <option value="18">18</option>
+                  <option value="9">9</option>
+                </select>
+              </label>
+              <label>
+                Tees
+                <input id="tees" name="tees" type="text" />
+              </label>
+              <label>
+                Score
+                <input id="score" name="score" min="1" type="number" required />
+              </label>
+              <label>
+                Travel
+                <select id="travel" name="travel">
+                  <option value="">Unknown</option>
+                  <option value="walking">Walking</option>
+                  <option value="riding">Riding</option>
+                </select>
+              </label>
+              <label>
+                Cost
+                <input id="cost" name="cost" min="0" step="0.01" type="number" />
+              </label>
+            </div>
+
+            <label>
+              Notes
+              <textarea id="notes" name="notes" rows="4"></textarea>
+            </label>
+
+            <label>
+              Tags
+              <input id="tags" name="tags" type="text" placeholder="walking, putting, best-round" />
+            </label>
+
+            <button class="button button-primary full-width" type="submit">Save Round</button>
+          </form>
+        </section>
+
+        <section class="stats-grid" aria-label="Golf journal stats">
+          <article class="stat-card">
+            <span>Rounds</span>
+            <strong id="stat-rounds">0</strong>
+            <small id="stat-rounds-detail">No rounds yet</small>
+          </article>
+          <article class="stat-card">
+            <span>Average Score</span>
+            <strong id="stat-average">—</strong>
+            <small id="stat-average-detail">Across saved rounds</small>
+          </article>
+          <article class="stat-card">
+            <span>Best Score</span>
+            <strong id="stat-best">—</strong>
+            <small id="stat-best-detail">Keep stacking data</small>
+          </article>
+          <article class="stat-card">
+            <span>Season Spend</span>
+            <strong id="stat-cost">$0</strong>
+            <small id="stat-cost-detail">Tracked round costs</small>
+          </article>
+        </section>
+
+        <section class="content-grid">
+          <section class="panel" id="journal">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Journal</p>
+                <h2>Recent rounds</h2>
+              </div>
+              <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
+            </div>
+            <div class="entry-list" id="entry-list"></div>
+          </section>
+
+          <aside class="panel insights" id="insights">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Insights</p>
+                <h2>Patterns</h2>
+              </div>
+            </div>
+            <div id="insight-list" class="insight-list"></div>
+          </aside>
+        </section>
+      </main>
+    </div>
+
+    <nav class="bottom-nav" aria-label="Primary">
+      <a href="#add">Add</a>
+      <a href="#journal">Journal</a>
+      <a href="#insights">Insights</a>
+    </nav>
+
+    <script src="./app.js?v=20260611" type="module"></script>
+  </body>
+</html>
