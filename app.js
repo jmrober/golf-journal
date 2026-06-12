@@ -759,21 +759,28 @@ function deleteEntry(id) {
 }
 
 function stats(entries) {
-  const rounds = entries.filter((entry) => entry.type === "round");
+  const rounds = entries
+    .filter((entry) => entry.type === "round")
+    .sort((a, b) => a.entryDate.localeCompare(b.entryDate));
   const scores = rounds.map((round) => round.score).filter(Number.isFinite);
-  const costs = rounds.map((round) => round.cost || 0);
+  const costs = rounds.map((round) => round.cost).filter(Number.isFinite);
   const totalCost = costs.reduce((sum, cost) => sum + cost, 0);
   const average = scores.length ? scores.reduce((sum, score) => sum + score, 0) / scores.length : null;
   const best = scores.length ? Math.min(...scores) : null;
-  const walking = rounds.filter((round) => round.walking).length;
+  const worst = scores.length ? Math.max(...scores) : null;
+  const walkingKnown = rounds.filter((round) => typeof round.walking === "boolean");
+  const walking = walkingKnown.filter((round) => round.walking).length;
 
   return {
     rounds,
     scores,
+    costs,
     totalCost,
     average,
     best,
-    walkingPercent: rounds.length ? Math.round((walking / rounds.length) * 100) : null,
+    worst,
+    averageCost: costs.length ? totalCost / costs.length : null,
+    walkingPercent: walkingKnown.length ? Math.round((walking / walkingKnown.length) * 100) : null,
   };
 }
 
@@ -791,11 +798,11 @@ function renderStats(calculated) {
   els.statRounds.textContent = calculated.rounds.length;
   els.statRoundsDetail.textContent = calculated.rounds.length === 1 ? "1 saved round" : `${calculated.rounds.length} saved rounds`;
   els.statAverage.textContent = calculated.average ? calculated.average.toFixed(1) : "—";
-  els.statAverageDetail.textContent = calculated.scores.length ? "Scoring baseline" : "Across saved rounds";
+  els.statAverageDetail.textContent = calculated.scores.length ? scoreRangeLabel(calculated) : "Across saved rounds";
   els.statBest.textContent = calculated.best || "—";
-  els.statBestDetail.textContent = calculated.best ? "Lowest saved score" : "Keep stacking data";
+  els.statBestDetail.textContent = calculated.best ? `Worst ${calculated.worst}` : "Keep stacking data";
   els.statCost.textContent = `$${calculated.totalCost.toFixed(0)}`;
-  els.statCostDetail.textContent = calculated.totalCost ? "Tracked round costs" : "Add cost to rounds";
+  els.statCostDetail.textContent = calculated.averageCost ? `$${calculated.averageCost.toFixed(0)} avg when tracked` : "Add cost to rounds";
 }
 
 function renderJournal(entries) {
@@ -828,25 +835,107 @@ function renderJournal(entries) {
 }
 
 function renderInsights(entries, calculated) {
-  if (calculated.rounds.length < 2) {
-    els.insightList.innerHTML = '<div class="empty-state">Log a few rounds first. Insights get better after 3-5 rounds.</div>';
+  if (!entries.length) {
+    els.insightList.innerHTML = '<div class="empty-state">Add a round, practice session, workout, or note and patterns will show up here.</div>';
     return;
   }
 
+  const practices = entries.filter((entry) => entry.type === "practice");
+  const workouts = entries.filter((entry) => entry.type === "workout");
+  const notes = entries.filter((entry) => entry.type === "note");
   const courseCounts = countBy(calculated.rounds.map((round) => round.courseName || round.title));
-  const tagCounts = countBy(calculated.rounds.flatMap((round) => round.tags || []));
-  const trend = calculated.scores.length >= 2 ? calculated.scores[0] - calculated.scores[calculated.scores.length - 1] : 0;
+  const tagCounts = countBy(entries.flatMap((entry) => entry.tags || []).filter((tag) => !["round", "practice", "workout", "note"].includes(tag)));
 
   els.insightList.innerHTML = [
-    insight("Score trend", trend < 0 ? `Recent score is ${Math.abs(trend)} higher than oldest saved round.` : `Recent score is ${trend} lower than oldest saved round.`),
-    insight("Walking", calculated.walkingPercent === null ? "Walking data is missing." : `${calculated.walkingPercent}% of saved rounds were walked.`),
-    insight("Most played course", topLabel(courseCounts) || "No course pattern yet."),
-    insight("Common themes", topLabel(tagCounts) || "Tags will reveal repeated misses and strengths."),
+    insight("Score trend", scoreTrendInsight(calculated)),
+    insight("Score range", calculated.scores.length ? `Average ${calculated.average.toFixed(1)}, best ${calculated.best}, worst ${calculated.worst}.` : "Add scored rounds to build a scoring baseline."),
+    insight("Costs", costInsight(calculated)),
+    insight("Walking", calculated.walkingPercent === null ? "Walking or riding data is missing." : `${calculated.walkingPercent}% of rounds with travel data were walked.`),
+    insight("Courses", topLabels(courseCounts, 3) || "Course patterns will appear after more rounds."),
+    insight("Common tags", topLabels(tagCounts, 4) || "Tags from rounds, practice, workouts, and notes will reveal repeated themes."),
+    insight("Practice and workout hints", activityCorrelationInsight(calculated.rounds, practices, workouts, notes)),
   ].join("");
 }
 
 function insight(title, body) {
   return `<div class="insight"><strong>${escapeHtml(title)}</strong>${escapeHtml(body)}</div>`;
+}
+
+function scoreRangeLabel(calculated) {
+  if (!calculated.scores.length) return "Across saved rounds";
+  if (calculated.scores.length === 1) return "First score logged";
+  return `Best ${calculated.best} · worst ${calculated.worst}`;
+}
+
+function scoreTrendInsight(calculated) {
+  if (calculated.scores.length < 2) {
+    return "Log at least two scored rounds before reading a trend.";
+  }
+
+  if (calculated.scores.length < 6) {
+    const firstScore = calculated.scores[0];
+    const latestScore = calculated.scores[calculated.scores.length - 1];
+    const difference = latestScore - firstScore;
+
+    if (difference === 0) {
+      return `Latest score matches the first saved score at ${latestScore}.`;
+    }
+
+    const direction = difference < 0 ? "lower" : "higher";
+    return `Latest score is ${Math.abs(difference)} strokes ${direction} than the first saved round.`;
+  }
+
+  const recentWindow = calculated.scores.slice(-3);
+  const olderWindow = calculated.scores.slice(0, 3);
+  const recentAverage = average(recentWindow);
+  const olderAverage = average(olderWindow);
+  const difference = recentAverage - olderAverage;
+
+  if (Math.abs(difference) < 1) {
+    return `Recent scoring is steady around ${recentAverage.toFixed(1)}.`;
+  }
+
+  const direction = difference < 0 ? "lower" : "higher";
+  return `Recent scoring is ${Math.abs(difference).toFixed(1)} strokes ${direction} than the earlier saved rounds.`;
+}
+
+function costInsight(calculated) {
+  if (!calculated.costs.length) {
+    return "Add round costs to track golf spend.";
+  }
+
+  return `$${calculated.totalCost.toFixed(0)} total across ${calculated.costs.length} cost-tracked rounds, about $${calculated.averageCost.toFixed(0)} each.`;
+}
+
+function activityCorrelationInsight(rounds, practices, workouts, notes) {
+  const scoredRounds = rounds.filter((round) => Number.isFinite(round.score));
+  const activities = [...practices, ...workouts];
+
+  if (!activities.length) {
+    return notes.length ? "Notes are being saved. Add practice or workout logs to compare them with future rounds." : "Add practice and workout logs to see light-touch patterns next to scores.";
+  }
+
+  if (scoredRounds.length < 4) {
+    return `${activities.length} practice/workout logs saved. Wait for 4+ scored rounds before treating patterns as meaningful.`;
+  }
+
+  const afterActivity = scoredRounds.filter((round) => activities.some((activity) => daysBetween(activity.entryDate, round.entryDate) >= 0 && daysBetween(activity.entryDate, round.entryDate) <= 7));
+  const afterActivityIds = new Set(afterActivity.map((round) => round.id));
+  const otherRounds = scoredRounds.filter((round) => !afterActivityIds.has(round.id));
+
+  if (afterActivity.length < 2 || otherRounds.length < 2) {
+    return `${activities.length} practice/workout logs saved. More paired rounds will make the comparison less noisy.`;
+  }
+
+  const activeAverage = average(afterActivity.map((round) => round.score));
+  const otherAverage = average(otherRounds.map((round) => round.score));
+  const difference = activeAverage - otherAverage;
+
+  if (Math.abs(difference) < 1) {
+    return `Rounds within a week of practice or workouts average ${activeAverage.toFixed(1)}, about the same as other rounds.`;
+  }
+
+  return `Rounds within a week of practice or workouts average ${activeAverage.toFixed(1)} versus ${otherAverage.toFixed(1)} otherwise. Treat that as a hint, not proof.`;
 }
 
 function countBy(values) {
@@ -856,9 +945,22 @@ function countBy(values) {
   }, {});
 }
 
-function topLabel(counts) {
-  const top = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-  return top ? `${top[0]} (${top[1]})` : "";
+function topLabels(counts, limit) {
+  return Object.entries(counts)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, limit)
+    .map(([label, count]) => `${label} (${count})`)
+    .join(", ");
+}
+
+function average(values) {
+  return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function daysBetween(startDate, endDate) {
+  const start = new Date(`${startDate}T00:00:00`);
+  const end = new Date(`${endDate}T00:00:00`);
+  return Math.round((end - start) / 86400000);
 }
 
 function escapeHtml(value) {
