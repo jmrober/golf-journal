@@ -11,7 +11,7 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Minimal Golf Journal</p>
-          <h1>Golf notes that turn into useful data.</h1>
+          <h1>Write the round down.</h1>
         </div>
         <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
       </header>
@@ -21,21 +21,21 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Quick Add</p>
-              <h2>Tell me about the entry</h2>
+              <h2>Capture what happened</h2>
             </div>
-            <span class="pill">Local only</span>
+            <span class="pill">Private journal</span>
           </div>
 
           <textarea
             id="raw-input"
             rows="6"
-            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Or: Practiced putting for 30 minutes. Or: Did mobility and core workout for 35 minutes."
+            placeholder="Played Timber Creek Saturday at 5:50 AM, walked 18 from the white tees and shot 86. Driver was solid. Putting needs work."
           ></textarea>
           <p class="voice-status" id="voice-status" aria-live="polite">Voice dictation ready.</p>
 
           <div class="button-row">
             <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false">Start Dictation</button>
-            <button class="button button-primary" id="parse-entry" type="button">Parse Entry</button>
+            <button class="button button-primary" id="parse-entry" type="button">Review</button>
             <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
           </div>
         </section>
@@ -44,7 +44,7 @@
           <div class="section-heading">
             <div>
               <p class="eyebrow">Parsed Preview</p>
-              <h2>Review before saving</h2>
+              <h2>Review the entry</h2>
             </div>
             <span class="pill" id="parse-confidence">Draft</span>
           </div>
@@ -188,6 +188,6 @@
       <a href="#insights">Insights</a>
     </nav>
 
-    <script src="./app.js?v=20260612-voice" type="module"></script>
+    <script src="./app.js?v=20260612-minimal" type="module"></script>
   </body>
 </html>
