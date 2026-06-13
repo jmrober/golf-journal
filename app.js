@@ -80,6 +80,9 @@ const sampleEntries = [
 ];
 
 const els = {
+  pageTitle: document.querySelector("#page-title"),
+  views: document.querySelectorAll("[data-page]"),
+  routeLinks: document.querySelectorAll("[href^='#home'], [href^='#journal'], [href^='#work']"),
   dictationFocus: document.querySelector("#dictation-focus"),
   dictationTranscript: document.querySelector("#dictation-transcript"),
   stopDictation: document.querySelector("#stop-dictation"),
@@ -109,6 +112,8 @@ const els = {
   tags: document.querySelector("#tags"),
   saveEntry: document.querySelector("#save-entry"),
   entryList: document.querySelector("#entry-list"),
+  journalSearch: document.querySelector("#journal-search"),
+  entryDetailContent: document.querySelector("#entry-detail-content"),
   insightList: document.querySelector("#insight-list"),
   loadSample: document.querySelector("#load-sample"),
   exportJson: document.querySelector("#export-json"),
@@ -128,6 +133,25 @@ let recognition = null;
 let isListening = false;
 let dictationBaseText = "";
 let dictationUsed = false;
+
+const pages = {
+  home: {
+    hash: "#home",
+    title: "What happened?",
+  },
+  journal: {
+    hash: "#journal",
+    title: "Past entries",
+  },
+  work: {
+    hash: "#work",
+    title: "Work list",
+  },
+  entry: {
+    hash: "#entry",
+    title: "Entry",
+  },
+};
 
 function readStore() {
   try {
@@ -784,6 +808,18 @@ function deleteEntry(id) {
   writeStore({ ...store, entries: store.entries.filter((entry) => entry.id !== id) });
 }
 
+function startEditingEntry(entry) {
+  editingId = entry.id;
+  parsedRawInput = entry.rawInput || "";
+  goToPage("home");
+  fillForm({
+    ...entry,
+    travel: entry.walking ? "walking" : entry.riding ? "riding" : "",
+    confidence: "Editing",
+  });
+  document.querySelector("#preview").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
 function stats(entries) {
   const rounds = entries
     .filter((entry) => entry.type === "round")
@@ -820,6 +856,49 @@ function render() {
   renderInsights(entries, calculated);
 }
 
+function routeFromHash() {
+  const route = window.location.hash.replace("#", "");
+  if (route.startsWith("entry/")) return "entry";
+  return pages[route] ? route : "home";
+}
+
+function entryIdFromHash() {
+  const route = window.location.hash.replace("#", "");
+  if (!route.startsWith("entry/")) return "";
+  return decodeURIComponent(route.slice("entry/".length));
+}
+
+function showPage(route = routeFromHash()) {
+  const page = pages[route] ? route : "home";
+
+  els.views.forEach((view) => {
+    view.classList.toggle("hidden", view.dataset.page !== page);
+  });
+
+  els.routeLinks.forEach((link) => {
+    const linkRoute = link.getAttribute("href")?.replace("#", "");
+    link.classList.toggle("is-active", linkRoute === page || (page === "entry" && linkRoute === "journal"));
+  });
+
+  if (page === "entry") {
+    renderEntryDetail(entryIdFromHash());
+    return;
+  }
+
+  els.pageTitle.textContent = pages[page].title;
+}
+
+function goToPage(page) {
+  const nextHash = pages[page]?.hash || pages.home.hash;
+
+  if (window.location.hash === nextHash) {
+    showPage(page);
+    return;
+  }
+
+  window.location.hash = nextHash;
+}
+
 function renderStats(calculated) {
   els.statRounds.textContent = calculated.rounds.length;
   els.statRoundsDetail.textContent = calculated.rounds.length === 1 ? "1 saved round" : `${calculated.rounds.length} saved rounds`;
@@ -832,32 +911,195 @@ function renderStats(calculated) {
 }
 
 function renderJournal(entries) {
+  const search = els.journalSearch.value.trim().toLowerCase();
+  const filteredEntries = search ? entries.filter((entry) => entryMatchesSearch(entry, search)) : entries;
+
   if (!entries.length) {
     els.entryList.innerHTML = '<div class="empty-state">No entries logged yet. Add your first dictated round, practice session, workout, or note and it will show up here.</div>';
     return;
   }
 
-  els.entryList.innerHTML = entries
+  if (!filteredEntries.length) {
+    els.entryList.innerHTML = `<div class="empty-state">No entries match “${escapeHtml(els.journalSearch.value.trim())}”. Try a course, score, tag, or phrase from the note.</div>`;
+    return;
+  }
+
+  els.entryList.innerHTML = filteredEntries
     .map(
       (entry) => `
         <article class="entry-card entry-card-${escapeHtml(entry.type)}">
+          <a class="entry-card-link" href="#entry/${encodeURIComponent(entry.id)}" aria-label="Read ${escapeHtml(entryTitle(entry))}">
+            <div>
+              <p class="entry-meta">${escapeHtml(entryMeta(entry))}</p>
+              <h3>${escapeHtml(entryTitle(entry))}</h3>
+              <p class="entry-summary">${escapeHtml(entry.summary || "")}</p>
+              <p class="entry-brief">${escapeHtml(entryBrief(entry))}</p>
+              <div class="entry-highlight-list">
+                ${renderHighlights(entry, 4)}
+              </div>
+            </div>
+            <div class="score-badge score-badge-${escapeHtml(entry.type)}">${escapeHtml(entryMainStat(entry))}</div>
+          </a>
           <div>
-            <p class="entry-meta">${escapeHtml(entryMeta(entry))}</p>
-            <h3>${escapeHtml(entryTitle(entry))}</h3>
-            <p class="entry-summary">${escapeHtml(entry.summary || entry.notes || "")}</p>
             <div class="tag-list">
               ${entryTags(entry).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
             </div>
             <div class="card-actions">
+              <a class="text-button" href="#entry/${encodeURIComponent(entry.id)}">Read</a>
               <button class="text-button" data-action="edit" data-id="${entry.id}" type="button">Edit</button>
               <button class="text-button danger" data-action="delete" data-id="${entry.id}" type="button">Delete</button>
             </div>
           </div>
-          <div class="score-badge score-badge-${escapeHtml(entry.type)}">${escapeHtml(entryMainStat(entry))}</div>
         </article>
       `,
     )
     .join("");
+}
+
+function entryMatchesSearch(entry, search) {
+  return [
+    entry.type,
+    entryTitle(entry),
+    entry.summary,
+    entry.notes,
+    entry.rawInput,
+    entry.courseName,
+    entry.tees,
+    entry.location,
+    entry.focusAreas?.join(" "),
+    entry.exercises?.map((exercise) => exercise.name).join(" "),
+    entry.tags?.join(" "),
+    entry.score,
+    entry.cost,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase()
+    .includes(search);
+}
+
+function entryBrief(entry) {
+  const brief = entry.rawInput || entry.notes || entry.summary || "No dictated note saved for this entry.";
+  return truncateText(brief, 220);
+}
+
+function truncateText(value, limit) {
+  const text = String(value).replace(/\s+/g, " ").trim();
+  if (text.length <= limit) return text;
+  return `${text.slice(0, limit - 1).trim()}…`;
+}
+
+function renderHighlights(entry, limit = 6) {
+  const highlights = entryHighlights(entry).slice(0, limit);
+  return highlights
+    .map(
+      (item) => `
+        <span class="entry-highlight">
+          <span class="entry-stat-label">${escapeHtml(item.label)}</span>
+          <span class="entry-stat-value">${escapeHtml(item.value)}</span>
+        </span>
+      `,
+    )
+    .join("");
+}
+
+function entryHighlights(entry) {
+  if (entry.type === "round") {
+    return [
+      statItem("Score", entry.score),
+      statItem("Holes", entry.holes),
+      statItem("Travel", entry.walking ? "Walked" : entry.riding ? "Rode" : ""),
+      statItem("Cost", Number.isFinite(entry.cost) ? `$${entry.cost.toFixed(0)}` : ""),
+      statItem("Tees", entry.tees),
+      statItem("Tee time", entry.teeTime),
+    ].filter(Boolean);
+  }
+
+  if (entry.type === "practice") {
+    return [
+      statItem("Duration", entry.durationMinutes ? `${entry.durationMinutes} min` : ""),
+      statItem("Focus", entry.focusAreas?.join(", ")),
+      statItem("Location", entry.location),
+      statItem("Tags", (entry.tags || []).slice(0, 2).join(", ")),
+    ].filter(Boolean);
+  }
+
+  if (entry.type === "workout") {
+    return [
+      statItem("Duration", entry.durationMinutes ? `${entry.durationMinutes} min` : ""),
+      statItem("Type", entry.workoutType),
+      statItem("Exercises", entry.exercises?.map((exercise) => exercise.name).join(", ")),
+      statItem("Tags", (entry.tags || []).slice(0, 2).join(", ")),
+    ].filter(Boolean);
+  }
+
+  return [
+    statItem("Type", "Note"),
+    statItem("Tags", (entry.tags || []).slice(0, 3).join(", ")),
+  ].filter(Boolean);
+}
+
+function statItem(label, value) {
+  if (value === null || value === undefined || value === "") return null;
+  return { label, value };
+}
+
+function renderEntryDetail(id) {
+  const entry = getEntry(id);
+
+  if (!entry) {
+    els.pageTitle.textContent = "Entry";
+    els.entryDetailContent.innerHTML = `
+      <a class="entry-detail-back" href="#journal">Back to past entries</a>
+      <section class="entry-detail-section">
+        <h2>Missing entry</h2>
+        <p>This journal entry could not be found.</p>
+      </section>
+    `;
+    return;
+  }
+
+  els.pageTitle.textContent = entryTitle(entry);
+  els.entryDetailContent.innerHTML = `
+    <a class="entry-detail-back" href="#journal">Back to past entries</a>
+    <header>
+      <p class="entry-detail-meta">${escapeHtml(entryMeta(entry))}</p>
+      <h1 class="entry-detail-title">${escapeHtml(entryTitle(entry))}</h1>
+    </header>
+    ${entryHeroStat(entry)}
+    <section class="entry-detail-stats" aria-label="Parsed entry highlights">
+      ${renderHighlights(entry)}
+    </section>
+    <section class="entry-detail-section">
+      <h2>What was said</h2>
+      <p>${escapeHtml(entry.rawInput || entry.notes || "No dictated note saved for this entry.")}</p>
+    </section>
+    <section class="entry-detail-section">
+      <h2>Journal brief</h2>
+      <p>${escapeHtml(entry.summary || entry.notes || "No summary yet.")}</p>
+    </section>
+    <section class="entry-detail-section">
+      <h2>Tags</h2>
+      <div class="tag-list">
+        ${entryTags(entry).map((tag) => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}
+      </div>
+    </section>
+    <div class="entry-detail-actions">
+      <button class="button button-secondary" data-action="edit" data-id="${entry.id}" type="button">Edit Entry</button>
+      <button class="button button-secondary" data-action="delete" data-id="${entry.id}" type="button">Delete Entry</button>
+    </div>
+  `;
+}
+
+function entryHeroStat(entry) {
+  const value = entry.type === "round" ? entry.score : entryMainStat(entry);
+  if (!value || value === "—" || value === "Log" || value === "Note") return "";
+
+  return `
+    <section class="entry-hero-stat" aria-label="${escapeHtml(entryTypeLabel(entry.type))} highlight">
+      <span>${escapeHtml(value)}</span>
+    </section>
+  `;
 }
 
 function renderInsights(entries, calculated) {
@@ -1055,7 +1297,9 @@ els.form.addEventListener("submit", (event) => {
   updateFormMode();
   els.preview.classList.add("hidden");
   render();
-  document.querySelector("#journal").scrollIntoView({ behavior: "smooth", block: "start" });
+  goToPage("home");
+  els.rawInput.focus();
+  els.voiceStatus.textContent = `${entryTypeLabel(entry.type)} saved. Ready for the next note.`;
 });
 
 els.entryList.addEventListener("click", (event) => {
@@ -1072,14 +1316,29 @@ els.entryList.addEventListener("click", (event) => {
     return;
   }
 
-  editingId = id;
-  parsedRawInput = entry.rawInput || "";
-  fillForm({
-    ...entry,
-    travel: entry.walking ? "walking" : entry.riding ? "riding" : "",
-    confidence: "Editing",
-  });
-  document.querySelector("#preview").scrollIntoView({ behavior: "smooth", block: "start" });
+  startEditingEntry(entry);
+});
+
+els.entryDetailContent.addEventListener("click", (event) => {
+  const button = event.target.closest("button[data-action]");
+  if (!button) return;
+
+  const { action, id } = button.dataset;
+  const entry = getEntry(id);
+  if (!entry) return;
+
+  if (action === "delete") {
+    deleteEntry(id);
+    render();
+    goToPage("journal");
+    return;
+  }
+
+  startEditingEntry(entry);
+});
+
+els.journalSearch.addEventListener("input", () => {
+  render();
 });
 
 els.loadSample.addEventListener("click", () => {
@@ -1103,4 +1362,10 @@ els.exportJson.addEventListener("click", () => {
 
 render();
 updateFormMode();
+showPage();
 setupDictation();
+
+window.addEventListener("hashchange", () => {
+  showPage();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+});

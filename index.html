@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Minimal Golf Journal</title>
-    <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./styles.css?v=20260613-rams-ui-2" />
   </head>
   <body>
     <section class="dictation-focus hidden" id="dictation-focus" aria-live="polite">
@@ -19,172 +19,194 @@
       <header class="topbar">
         <div>
           <p class="eyebrow">Golf Journal</p>
-          <h1>What happened?</h1>
+          <h1 id="page-title">What happened?</h1>
         </div>
+        <nav class="topbar-nav" aria-label="Pages">
+          <a href="#home" data-route="home">Dictate</a>
+          <a href="#journal" data-route="journal">Past entries</a>
+          <a href="#work" data-route="work">Work list</a>
+        </nav>
       </header>
 
       <main>
-        <section class="panel quick-add" id="add">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Journal Input</p>
-              <h2>Say it once. Keep what matters.</h2>
+        <section class="view page-home" id="home" data-page="home">
+          <section class="panel quick-add recorder-shell" id="add">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">New recording</p>
+                <h2>Say it once. Keep what matters.</h2>
+              </div>
+              <span class="pill">Private</span>
             </div>
-            <span class="pill">Private</span>
-          </div>
 
-          <textarea
-            id="raw-input"
-            rows="6"
-            placeholder="Played Timber Creek Saturday at 5:50 AM. Walked 18 from the white tees and shot 86. Driver was solid. Putting needs work."
-          ></textarea>
-          <p class="voice-status" id="voice-status" aria-live="polite">Voice dictation ready.</p>
+            <div class="recorder-panel">
+              <div class="recorder-status">
+                <span class="record-dot" aria-hidden="true"></span>
+                <span id="voice-status" aria-live="polite">Voice dictation ready.</span>
+              </div>
+              <div class="waveform" aria-hidden="true">
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+                <span></span><span></span><span></span><span></span><span></span><span></span>
+              </div>
+              <textarea
+                id="raw-input"
+                rows="6"
+                placeholder="Played Timber Creek Saturday at 5:50 AM. Walked 18 from the white tees and shot 86. Driver was solid. Putting needs work."
+              ></textarea>
+            </div>
 
-          <div class="button-row">
-            <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false">Dictate Round</button>
-            <button class="button button-primary" id="parse-entry" type="button">Review</button>
-            <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
-          </div>
+            <div class="button-row">
+              <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false"><span class="button-icon record-icon"></span>Dictate Round</button>
+              <button class="button button-primary" id="parse-entry" type="button">Review</button>
+              <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
+            </div>
+          </section>
 
-          <nav class="home-actions" aria-label="Journal shortcuts">
-            <a href="#journal">Past entries</a>
-            <a href="#insights">Work list</a>
-          </nav>
+          <section class="panel preview hidden" id="preview">
+            <div class="section-heading">
+              <div>
+                <p class="eyebrow">Review</p>
+                <h2>Keep it accurate.</h2>
+              </div>
+              <span class="pill" id="parse-confidence">Draft</span>
+            </div>
+
+            <form id="entry-form" class="entry-form">
+              <div class="form-grid">
+                <label>
+                  Type
+                  <select id="entry-type" name="entryType">
+                    <option value="round">Round</option>
+                    <option value="practice">Practice</option>
+                    <option value="workout">Workout</option>
+                    <option value="note">Note</option>
+                  </select>
+                </label>
+                <label>
+                  Title
+                  <input id="entry-title" name="entryTitle" type="text" required />
+                </label>
+                <label>
+                  Date
+                  <input id="entry-date" name="entryDate" type="date" required />
+                </label>
+              </div>
+
+              <div class="form-grid" id="round-fields">
+                <label>
+                  Tee time
+                  <input id="tee-time" name="teeTime" type="time" />
+                </label>
+                <label>
+                  Holes
+                  <select id="holes" name="holes">
+                    <option value="18">18</option>
+                    <option value="9">9</option>
+                  </select>
+                </label>
+                <label>
+                  Tees
+                  <input id="tees" name="tees" type="text" />
+                </label>
+                <label>
+                  Score
+                  <input id="score" name="score" min="1" type="number" />
+                </label>
+                <label>
+                  Travel
+                  <select id="travel" name="travel">
+                    <option value="">Unknown</option>
+                    <option value="walking">Walking</option>
+                    <option value="riding">Riding</option>
+                  </select>
+                </label>
+              </div>
+
+              <div class="form-grid hidden" id="activity-fields">
+                <label>
+                  Duration
+                  <input id="duration" name="duration" min="0" type="number" />
+                </label>
+                <label>
+                  Location
+                  <input id="location" name="location" type="text" />
+                </label>
+                <label>
+                  Focus
+                  <input id="focus" name="focus" type="text" />
+                </label>
+              </div>
+
+              <label class="cost-field">
+                Cost
+                <input id="cost" name="cost" min="0" step="0.01" type="number" />
+              </label>
+
+              <label>
+                Notes
+                <textarea id="notes" name="notes" rows="4"></textarea>
+              </label>
+
+              <label>
+                Tags
+                <input id="tags" name="tags" type="text" placeholder="walking, putting, best-round" />
+              </label>
+
+              <button class="button button-primary full-width" id="save-entry" type="submit">Save Entry</button>
+            </form>
+          </section>
         </section>
 
-        <section class="panel preview hidden" id="preview">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Review</p>
-              <h2>Keep it accurate.</h2>
-            </div>
-            <span class="pill" id="parse-confidence">Draft</span>
-          </div>
+        <section class="view hidden" id="journal" data-page="journal">
+          <section class="stats-grid" aria-label="Golf journal wrap up">
+            <article class="stat-card">
+              <span>Rounds</span>
+              <strong id="stat-rounds">0</strong>
+              <small id="stat-rounds-detail">No rounds yet</small>
+            </article>
+            <article class="stat-card">
+              <span>Average Score</span>
+              <strong id="stat-average">—</strong>
+              <small id="stat-average-detail">Across saved rounds</small>
+            </article>
+            <article class="stat-card">
+              <span>Best Score</span>
+              <strong id="stat-best">—</strong>
+              <small id="stat-best-detail">Keep stacking data</small>
+            </article>
+            <article class="stat-card">
+              <span>Season Spend</span>
+              <strong id="stat-cost">$0</strong>
+              <small id="stat-cost-detail">Tracked round costs</small>
+            </article>
+          </section>
 
-          <form id="entry-form" class="entry-form">
-            <div class="form-grid">
-              <label>
-                Type
-                <select id="entry-type" name="entryType">
-                  <option value="round">Round</option>
-                  <option value="practice">Practice</option>
-                  <option value="workout">Workout</option>
-                  <option value="note">Note</option>
-                </select>
-              </label>
-              <label>
-                Title
-                <input id="entry-title" name="entryTitle" type="text" required />
-              </label>
-              <label>
-                Date
-                <input id="entry-date" name="entryDate" type="date" required />
-              </label>
-            </div>
-
-            <div class="form-grid" id="round-fields">
-              <label>
-                Tee time
-                <input id="tee-time" name="teeTime" type="time" />
-              </label>
-              <label>
-                Holes
-                <select id="holes" name="holes">
-                  <option value="18">18</option>
-                  <option value="9">9</option>
-                </select>
-              </label>
-              <label>
-                Tees
-                <input id="tees" name="tees" type="text" />
-              </label>
-              <label>
-                Score
-                <input id="score" name="score" min="1" type="number" />
-              </label>
-              <label>
-                Travel
-                <select id="travel" name="travel">
-                  <option value="">Unknown</option>
-                  <option value="walking">Walking</option>
-                  <option value="riding">Riding</option>
-                </select>
-              </label>
-            </div>
-
-            <div class="form-grid hidden" id="activity-fields">
-              <label>
-                Duration
-                <input id="duration" name="duration" min="0" type="number" />
-              </label>
-              <label>
-                Location
-                <input id="location" name="location" type="text" />
-              </label>
-              <label>
-                Focus
-                <input id="focus" name="focus" type="text" />
-              </label>
-            </div>
-
-            <label class="cost-field">
-              Cost
-              <input id="cost" name="cost" min="0" step="0.01" type="number" />
-            </label>
-
-            <label>
-              Notes
-              <textarea id="notes" name="notes" rows="4"></textarea>
-            </label>
-
-            <label>
-              Tags
-              <input id="tags" name="tags" type="text" placeholder="walking, putting, best-round" />
-            </label>
-
-            <button class="button button-primary full-width" id="save-entry" type="submit">Save Entry</button>
-          </form>
-        </section>
-
-        <section class="stats-grid" aria-label="Golf journal wrap up">
-          <article class="stat-card">
-            <span>Rounds</span>
-            <strong id="stat-rounds">0</strong>
-            <small id="stat-rounds-detail">No rounds yet</small>
-          </article>
-          <article class="stat-card">
-            <span>Average Score</span>
-            <strong id="stat-average">—</strong>
-            <small id="stat-average-detail">Across saved rounds</small>
-          </article>
-          <article class="stat-card">
-            <span>Best Score</span>
-            <strong id="stat-best">—</strong>
-            <small id="stat-best-detail">Keep stacking data</small>
-          </article>
-          <article class="stat-card">
-            <span>Season Spend</span>
-            <strong id="stat-cost">$0</strong>
-            <small id="stat-cost-detail">Tracked round costs</small>
-          </article>
-        </section>
-
-        <section class="content-grid">
-          <section class="panel" id="journal">
+          <section class="panel">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Journal</p>
-                <h2>Log</h2>
+                <h2>Past entries</h2>
               </div>
               <div class="section-actions">
-                <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
+                <button class="button button-secondary" id="load-sample" type="button">Load Examples</button>
                 <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
               </div>
             </div>
+            <label class="search-field">
+              Search entries
+              <input id="journal-search" type="search" placeholder="Search course, score, putting, walking, notes..." />
+            </label>
             <div class="entry-list" id="entry-list"></div>
           </section>
+        </section>
 
-          <aside class="panel insights" id="insights">
+        <section class="view hidden" id="entry-detail" data-page="entry">
+          <article class="entry-detail-article" id="entry-detail-content"></article>
+        </section>
+
+        <section class="view hidden" id="work" data-page="work">
+          <section class="panel insights">
             <div class="section-heading">
               <div>
                 <p class="eyebrow">Next</p>
@@ -192,17 +214,11 @@
               </div>
             </div>
             <div id="insight-list" class="insight-list"></div>
-          </aside>
+          </section>
         </section>
       </main>
     </div>
 
-    <nav class="bottom-nav" aria-label="Primary">
-      <a href="#add">Write</a>
-      <a href="#journal">Log</a>
-      <a href="#insights">Next</a>
-    </nav>
-
-    <script src="./app.js?v=20260612-rams" type="module"></script>
+    <script src="./app.js?v=20260613-rams-ui-2" type="module"></script>
   </body>
 </html>
