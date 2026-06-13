@@ -824,16 +824,26 @@ label {
 
 @media (max-width: 560px) {
   .app-shell {
-    padding: 18px 12px 42px;
+    padding: 16px 12px 28px;
+  }
+
+  .topbar {
+    gap: 14px;
+    padding: 12px 0 18px;
   }
 
   .topbar h1 {
-    font-size: 56px;
+    font-size: 48px;
+    line-height: 0.9;
+  }
+
+  .topbar-nav {
+    gap: 12px;
   }
 
   .section-heading h2,
   .entry-card h3 {
-    font-size: 30px;
+    font-size: 28px;
   }
 
   .entry-detail-title {
@@ -851,21 +861,71 @@ label {
   .quick-add,
   .preview,
   .content-grid .panel {
-    padding: 20px 0;
+    padding: 16px 0;
+  }
+
+  .quick-add {
+    min-height: auto;
+    justify-content: flex-start;
+  }
+
+  .section-heading {
+    margin-bottom: 14px;
+  }
+
+  .recorder-panel {
+    order: 3;
+    gap: 12px;
+    padding: 16px;
+    border-radius: 24px;
+  }
+
+  .waveform {
+    min-height: 54px;
+    padding: 2px 0;
+  }
+
+  .waveform span {
+    height: 22px;
+  }
+
+  .waveform span:nth-child(2n) {
+    height: 34px;
+  }
+
+  .waveform span:nth-child(3n) {
+    height: 28px;
+  }
+
+  .waveform span:nth-child(5n) {
+    height: 44px;
   }
 
   textarea {
-    min-height: 320px;
+    min-height: 220px;
     font-size: 24px;
   }
 
   .recorder-panel textarea {
-    min-height: 260px;
-    font-size: 28px;
+    min-height: 132px;
+    max-height: 34vh;
+    font-size: 24px;
+    line-height: 1.35;
   }
 
   .button-row {
-    grid-template-columns: 1fr;
+    order: 2;
+    grid-template-columns: 1fr 1fr;
+    margin: 0 0 12px;
+  }
+
+  #parse-entry {
+    order: -1;
+    grid-column: 1 / -1;
+  }
+
+  .button {
+    min-height: 52px;
   }
 
   .entry-card {
