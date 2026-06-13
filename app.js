@@ -80,6 +80,9 @@ const sampleEntries = [
 ];
 
 const els = {
+  dictationFocus: document.querySelector("#dictation-focus"),
+  dictationTranscript: document.querySelector("#dictation-transcript"),
+  stopDictation: document.querySelector("#stop-dictation"),
   rawInput: document.querySelector("#raw-input"),
   toggleDictation: document.querySelector("#toggle-dictation"),
   voiceStatus: document.querySelector("#voice-status"),
@@ -169,6 +172,7 @@ function setupDictation() {
   recognition.addEventListener("start", () => {
     isListening = true;
     dictationBaseText = els.rawInput.value.trim();
+    enterDictationFocus();
     setDictationState("listening", "Listening...");
   });
 
@@ -193,16 +197,19 @@ function setupDictation() {
     }
 
     els.rawInput.value = [dictationBaseText, interimText.trim()].filter(Boolean).join(" ");
+    renderDictationTranscript(els.rawInput.value);
     els.voiceStatus.textContent = interimText ? "Listening..." : "Dictation captured.";
   });
 
   recognition.addEventListener("end", () => {
     isListening = false;
+    exitDictationFocus();
     setDictationState("idle", els.rawInput.value.trim() ? "Dictation stopped." : "Voice dictation ready.");
   });
 
   recognition.addEventListener("error", (event) => {
     isListening = false;
+    exitDictationFocus();
     setDictationState("idle", voiceErrorMessage(event.error));
   });
 }
@@ -226,8 +233,27 @@ function setDictationState(state, message) {
   const listening = state === "listening";
   els.toggleDictation.classList.toggle("is-listening", listening);
   els.toggleDictation.setAttribute("aria-pressed", String(listening));
-  els.toggleDictation.textContent = listening ? "Stop Dictation" : "Start Dictation";
+  els.toggleDictation.textContent = listening ? "Stop Dictation" : "Dictate Round";
   els.voiceStatus.textContent = message;
+}
+
+function enterDictationFocus() {
+  document.body.classList.add("is-dictating");
+  els.dictationFocus.classList.remove("hidden");
+  renderDictationTranscript(els.rawInput.value);
+}
+
+function exitDictationFocus() {
+  document.body.classList.remove("is-dictating");
+  els.dictationFocus.classList.add("hidden");
+}
+
+function renderDictationTranscript(text) {
+  const transcript = text.trim() || "Start talking.";
+  const importantPattern =
+    /(\$\d+(?:\.\d{1,2})?|\b\d{1,2}:\d{2}\s?(?:a\.?m\.?|p\.?m\.?|am|pm)?\b|\b(?:walked|walking|rode|riding|driver|putting|putts?|irons?|wedges?|score|shot|holes?|tees?|practice|workout|mobility|core|lesson|tip|focus)\b|\b(?:[6-9]\d|1[0-4]\d)\b)/gi;
+
+  els.dictationTranscript.innerHTML = escapeHtml(transcript).replace(importantPattern, "<strong>$1</strong>");
 }
 
 function voiceErrorMessage(error) {
@@ -1003,6 +1029,7 @@ els.clearEntry.addEventListener("click", () => {
   els.rawInput.value = "";
   dictationBaseText = "";
   dictationUsed = false;
+  renderDictationTranscript("");
   els.form.reset();
   updateFormMode();
   els.preview.classList.add("hidden");
@@ -1010,6 +1037,7 @@ els.clearEntry.addEventListener("click", () => {
 });
 
 els.toggleDictation.addEventListener("click", toggleDictation);
+els.stopDictation.addEventListener("click", toggleDictation);
 
 els.entryType.addEventListener("change", updateFormMode);
 
@@ -1022,6 +1050,7 @@ els.form.addEventListener("submit", (event) => {
   els.rawInput.value = "";
   dictationBaseText = "";
   dictationUsed = false;
+  renderDictationTranscript("");
   els.form.reset();
   updateFormMode();
   els.preview.classList.add("hidden");

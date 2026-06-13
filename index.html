@@ -7,13 +7,20 @@
     <link rel="stylesheet" href="./styles.css" />
   </head>
   <body>
+    <section class="dictation-focus hidden" id="dictation-focus" aria-live="polite">
+      <div>
+        <p class="eyebrow">Dictating</p>
+        <div class="dictation-transcript" id="dictation-transcript">Start talking.</div>
+      </div>
+      <button class="button button-primary dictation-stop" id="stop-dictation" type="button">Stop Dictation</button>
+    </section>
+
     <div class="app-shell">
       <header class="topbar">
         <div>
           <p class="eyebrow">Golf Journal</p>
           <h1>What happened?</h1>
         </div>
-        <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
       </header>
 
       <main>
@@ -34,10 +41,15 @@
           <p class="voice-status" id="voice-status" aria-live="polite">Voice dictation ready.</p>
 
           <div class="button-row">
-            <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false">Start Dictation</button>
+            <button class="button button-secondary button-dictate" id="toggle-dictation" type="button" aria-pressed="false">Dictate Round</button>
             <button class="button button-primary" id="parse-entry" type="button">Review</button>
             <button class="button button-secondary" id="clear-entry" type="button">Clear</button>
           </div>
+
+          <nav class="home-actions" aria-label="Journal shortcuts">
+            <a href="#journal">Past entries</a>
+            <a href="#insights">Work list</a>
+          </nav>
         </section>
 
         <section class="panel preview hidden" id="preview">
@@ -164,7 +176,10 @@
                 <p class="eyebrow">Journal</p>
                 <h2>Log</h2>
               </div>
-              <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
+              <div class="section-actions">
+                <button class="button button-secondary" id="load-sample" type="button">Load Sample</button>
+                <button class="button button-secondary" id="export-json" type="button">Export JSON</button>
+              </div>
             </div>
             <div class="entry-list" id="entry-list"></div>
           </section>

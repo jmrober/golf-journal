@@ -28,6 +28,10 @@ body {
   color: var(--text-primary);
 }
 
+body.is-dictating {
+  overflow: hidden;
+}
+
 button,
 input,
 select,
@@ -43,6 +47,39 @@ button {
   width: min(1040px, 100%);
   margin: 0 auto;
   padding: 26px 18px 104px;
+}
+
+.dictation-focus {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 28px;
+  padding: 32px clamp(18px, 5vw, 64px);
+  background: var(--background);
+}
+
+.dictation-focus.hidden {
+  display: none;
+}
+
+.dictation-transcript {
+  max-width: 980px;
+  padding-top: 14vh;
+  font-size: clamp(34px, 7vw, 78px);
+  font-weight: 400;
+  line-height: 1.05;
+}
+
+.dictation-transcript strong {
+  font-weight: 700;
+}
+
+.dictation-stop {
+  width: min(360px, 100%);
+  min-height: 58px;
+  justify-self: center;
 }
 
 .topbar {
@@ -92,7 +129,10 @@ button {
 
 .quick-add {
   border-bottom-color: var(--border-strong);
-  min-height: 52vh;
+  display: flex;
+  min-height: calc(100vh - 190px);
+  flex-direction: column;
+  justify-content: center;
 }
 
 .preview {
@@ -115,6 +155,13 @@ button {
   font-size: 22px;
   font-weight: 500;
   line-height: 1.05;
+}
+
+.section-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
 .pill {
@@ -189,9 +236,38 @@ label {
 
 .button-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) auto;
   gap: 8px;
   margin-top: 14px;
+}
+
+.home-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.home-actions a {
+  display: grid;
+  min-height: 46px;
+  place-items: center;
+  border: 1px solid var(--border);
+  color: var(--text-primary);
+  font-family:
+    ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+}
+
+.home-actions a:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
 }
 
 .voice-status {
